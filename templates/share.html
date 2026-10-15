@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>🔗 共有データ: {{ data.name if data and data.name else 'プラグタイマーデータ' }}</h1>
+
+<div class="share-section">
+    <h2>共有リンク</h2>
+    <div class="share-info">
+        <span class="share-link">{{ share_url }}</span>
+        <button class="secondary btn-small" onclick="copyLink()">📋 コピー</button>
+    </div>
+    <div class="qr-container">
+        <img src="{{ qr_code }}" alt="Share QR Code" style="width: 150px; height: 150px;">
+    </div>
+    <p style="text-align: center; color: var(--sub); font-size: .8rem;">
+        このQRコードをスキャンしてデータをインポートできます
+    </p>
+</div>
+
+<div class="user-info">
+    <span>👤 共有者: {{ owner_username if owner_username else 'Unknown' }}</span>
+    <span class="user-id">共有ID: {{ share_id }}</span>
+</div>
+
+<h2>記録一覧</h2>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>完了日時</th>
+                <th>個数</th>
+                <th>組立</th>
+                <th>分解</th>
+                <th>合計</th>
+                <th>レベル</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if data and data.records %}
+                {% for record in data.records[:50] %}
+                <tr>
+                    <td>{{ record.timestamp[:19] if record.timestamp else 'N/A' }}</td>
+                    <td>{{ record.plugCount if record.plugCount else 'N/A' }}個</td>
+                    <td>{{ record.assemblyTime | fmt if record.assemblyTime else '00:00.0' }}</td>
+                    <td>{{ record.disassemblyTime | fmt if record.disassemblyTime else '00:00.0' }}</td>
+                    <td>{{ (record.assemblyTime + record.disassemblyTime) | fmt if record.assemblyTime and record.disassemblyTime else '00:00.0' }}</td>
+                    <td>
+                        {% if record.level %}
+                            <span class="lvl-tag lvl-{{ record.level }}">Lv{{ record.level }}</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="6" style="text-align: center; color: var(--sub);">記録がありません</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if data and data.records and data.records|length > 50 %}
+<p style="text-align: center; color: var(--sub); font-size: .8rem; margin-top: 12px;">
+    最初の50件を表示しています
+</p>
+{% endif %}
+
+<div class="share-section" style="margin-top: 20px;">
+    <h2>データをインポート</h2>
+    <p style="color: var(--sub); margin-bottom: 12px;">
+        このデータを自分のアカウントにインポートするには、
+        メインページの「インポート」ボタンを使用するか、
+        上記のQRコードをスキャンしてください。
+    </p>
+    <button class="primary" onclick="window.location.href='/'">🏠 メインページに戻る</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function copyLink() {
+    navigator.clipboard.writeText('{{ share_url }}')
+        .then(() => alert('リンクをコピーしました'))
+        .catch(err => alert('コピーに失敗しました'));
+}
+</script>
+{% endblock %}

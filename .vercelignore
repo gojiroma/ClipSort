@@ -1,0 +1,16 @@
+# Ignore files for Vercel deployment
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.env.local
+venv
+virtualenv
+.DS_Store
+*.md
+*.txt
+!requirements.txt

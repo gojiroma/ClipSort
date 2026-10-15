@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="text-align: center; padding: 40px 20px;">
+    <h1 style="color: var(--bad);">❌ {{ message }}</h1>
+    <p style="color: var(--sub); margin: 20px 0;">
+        共有データが見つかりませんでした。
+        リンクが正しいか、共有が有効かをご確認ください。
+    </p>
+    <button class="primary" onclick="window.location.href='/'">🏠 メインページに戻る</button>
+</div>
+{% endblock %}

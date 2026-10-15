@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>🔧 プラグ組立・分解 タイム記録</h1>
+
+<!-- User Info Section -->
+<div class="user-info">
+    <span>👤 <strong>{{ username }}</strong></span>
+    <span class="user-id">ID: {{ user_id }}</span>
+    <button class="secondary btn-small" onclick="showUsernameModal()">📝 名前変更</button>
+    <button class="secondary btn-small" onclick="showShareModal()">🔗 共有</button>
+</div>
+
+<!-- QR Code for User Binding -->
+<div class="share-section" style="display: none;" id="qrSection">
+    <h2>📱 データバインド用QRコード</h2>
+    <div class="qr-container">
+        <img src="{{ qr_code }}" alt="User QR Code" style="width: 150px; height: 150px;">
+    </div>
+    <p style="text-align: center; color: var(--sub); font-size: .8rem;">
+        このQRコードで他のデバイスとデータを同期できます
+    </p>
+</div>
+
+<div class="setup">
+    <span class="setup-label">個数</span>
+    <div class="radio-group">
+        <label class="radio-option"><input type="radio" name="count" value="10" checked><span>10個<br><small>レベル1<br>8 / 6分</small></span></label>
+        <label class="radio-option"><input type="radio" name="count" value="15"><span>15個<br><small>レベル2<br>10 / 8分</small></span></label>
+        <label class="radio-option"><input type="radio" name="count" value="20"><span>20個<br><small>レベル3<br>11 / 9分</small></span></label>
+    </div>
+</div>
+
+<div class="timers">
+    <div class="card" id="ac">
+        <h3>組立</h3>
+        <div class="time" id="ad">00:00.0</div>
+        <button class="timerbtn" id="ab">開始</button>
+        <button class="completebtn" id="ax" disabled>組立を完了して分解へ</button>
+        <div class="compare" id="ap"></div>
+    </div>
+    <div class="card" id="dc">
+        <h3>分解</h3>
+        <div class="time" id="dd">00:00.0</div>
+        <button class="timerbtn" id="db" disabled>開始</button>
+        <button class="completebtn" id="dx" disabled>分解を完了して記録</button>
+        <div class="compare" id="dp"></div>
+    </div>
+</div>
+
+<h2>サマリー</h2>
+<div id="stats"></div>
+
+<h2>記録一覧 <span id="count">0回の記録</span></h2>
+<div class="io">
+    <button id="export">📤 エクスポート</button>
+    <button id="importBtn">📥 インポート</button>
+    <button id="addBtn">➕ 記録を追加</button>
+    <button id="showQrBtn" class="secondary">📱 QR表示</button>
+    <input id="fileInput" type="file" accept="application/json,.json" hidden>
+</div>
+
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>完了日時</th>
+                <th>個数</th>
+                <th>組立</th>
+                <th>分解</th>
+                <th>合計</th>
+                <th>レベル</th>
+                <th>コメント</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody id="body"></tbody>
+    </table>
+</div>
+<div class="empty" id="empty">まだ記録がありません</div>
+<div class="danger-row">
+    <button class="danger" id="clear">すべての記録を削除</button>
+</div>
+
+<h2>タイム推移</h2>
+<div id="charts"></div>
+
+<!-- Share Status -->
+{% if share_url %}
+<div class="share-section">
+    <h2>🔗 共有リンク</h2>
+    <div class="share-info">
+        <span class="share-link" id="shareLink">{{ share_url }}</span>
+        <button class="secondary btn-small" onclick="copyShareLink()">📋 コピー</button>
+    </div>
+    <div class="qr-container">
+        <img src="{{ qr_code }}" alt="Share QR Code" style="width: 100px; height: 100px;">
+    </div>
+    <p style="color: var(--sub); font-size: .8rem;">
+        このリンクでデータを永続的に共有できます
+    </p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block modals %}
+<!-- Comment Modal -->
+<div class="modal" id="modal">
+    <div class="modal-box">
+        <button class="close" id="close">✕</button>
+        <div class="modal-title" id="modalTitle">コメント編集</div>
+        <div class="comment-display" id="display"></div>
+        <textarea class="comment-input" id="input" placeholder="記録についてのコメントを入力してください...">
+        </textarea>
+        <div class="modal-actions">
+            <button class="secondary" id="cancel">キャンセル</button>
+            <button class="primary" id="saveComment">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Record Modal -->
+<div class="modal" id="addModal">
+    <div class="modal-box">
+        <button class="close" id="addClose">✕</button>
+        <div class="modal-title">記録を手動追加</div>
+        <div class="form-group">
+            <label class="form-label">個数</label>
+            <select class="form-input" id="addCount">
+                <option value="10">10個（レベル1）</option>
+                <option value="15">15個（レベル2）</option>
+                <option value="20">20個（レベル3）</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">組立時間（mm:ss.s）</label>
+            <input class="form-input" id="addAssembly" type="text" placeholder="例: 07:30.5">
+        </div>
+        <div class="form-group">
+            <label class="form-label">分解時間（mm:ss.s）</label>
+            <input class="form-input" id="addDisassembly" type="text" placeholder="例: 05:45.2">
+        </div>
+        <div class="form-group">
+            <label class="form-label">コメント（任意）</label>
+            <textarea class="comment-input" id="addComment" placeholder="記録についてのコメント...">
+            </textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="secondary" id="addCancel">キャンセル</button>
+            <button class="primary" id="addSave">追加</button>
+        </div>
+    </div>
+</div>
+
+<!-- Username Modal -->
+<div class="modal" id="usernameModal">
+    <div class="modal-box">
+        <button class="close" id="usernameClose">✕</button>
+        <div class="modal-title">ユーザー名を設定</div>
+        <div class="form-group">
+            <label class="form-label">新しいユーザー名（ユニーク）</label>
+            <input class="form-input" id="newUsername" type="text" placeholder="例: takahashi">
+        </div>
+        <div class="modal-actions">
+            <button class="secondary" id="usernameCancel">キャンセル</button>
+            <button class="primary" id="usernameSave">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal" id="shareModal">
+    <div class="modal-box">
+        <button class="close" id="shareClose">✕</button>
+        <div class="modal-title">データを共有</div>
+        <div class="form-group">
+            <label class="form-label">共有名（任意）</label>
+            <input class="form-input" id="shareName" type="text" placeholder="例: 我的プラグ記録">
+        </div>
+        <div id="sharePreview" style="margin: 16px 0;"></div>
+        <div class="modal-actions">
+            <button class="secondary" id="shareCancel">キャンセル</button>
+            <button class="primary" id="shareCreate">共有リンクを作成</button>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal" id="importModal">
+    <div class="modal-box">
+        <button class="close" id="importClose">✕</button>
+        <div class="modal-title">データをバインド</div>
+        <p style="margin-bottom: 12px; color: var(--sub);">
+            QRコードをスキャンするか、共有IDを入力してください
+        </p>
+        <div class="form-group">
+            <label class="form-label">QRコード内容 or 共有ID</label>
+            <input class="form-input" id="bindInput" type="text" placeholder="QRコードをスキャンした内容を入力">
+        </div>
+        <div class="modal-actions">
+            <button class="secondary" id="bindCancel">キャンセル</button>
+            <button class="primary" id="bindSubmit">バインド</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    // Parse initial data from server
+    var initialRecords = {{ records | default('[]') | safe }};
+    var initialComments = {{ comments | default('{}') | safe }};
+    var initialState = {{ state | default('{}') | safe }};
+    
+    // Convert to arrays/objects if they're strings
+    if (typeof initialRecords === 'string') initialRecords = JSON.parse(initialRecords || '[]');
+    if (typeof initialComments === 'string') initialComments = JSON.parse(initialComments || '{}');
+    if (typeof initialState === 'string') initialState = JSON.parse(initialState || '{}');
+    
+    var R = initialRecords || [];
+    var C = initialComments || {};
+    var DEFAULT_STATE = {pc: 10, ae: 0, de: 0, ar: false, dr: false, as: 0, ds: 0, at: null, dt: null, edit: null, aComplete: false};
+    var s = {};
+    
+    // サーバー/保存データを検証して状態にマージする(未定義・NaN は既定値のまま)
+    function applyState(src) {
+        var n = {};
+        Object.keys(DEFAULT_STATE).forEach(function(k) { n[k] = DEFAULT_STATE[k]; });
+        ['ae', 'de'].forEach(function(k) {
+            var v = src && Number(src[k]);
+            if (isFinite(v) && v >= 0) n[k] = v;
+        });
+        if (src && L[src.pc]) n.pc = src.pc;
+        n.aComplete = !!(src && src.aComplete);
+        // 計測中フラグは performance.now() 基準で再読込後は無効なので引き継がない
+        n.at = s.at; n.dt = s.dt; n.ar = !!s.ar; n.dr = !!s.dr; n.as = s.as || 0; n.ds = s.ds || 0;
+        s = n;
+    }
+    applyState(initialState);
+    
+    var userId = '{{ user_id }}';
+    var username = '{{ username }}';
+    var currentShareId = '{{ share_id }}';
+    
+    // Auto-save to server every 30 seconds
+    var autoSaveInterval = null;
+    
+    function autoSave() {
+        if (R.length > 0) {
+            saveToServer();
+        }
+    }
+    
+    function startAutoSave() {
+        if (autoSaveInterval) clearInterval(autoSaveInterval);
+        autoSaveInterval = setInterval(autoSave, 30000);
+    }
+    
+    function stopAutoSave() {
+        if (autoSaveInterval) {
+            clearInterval(autoSaveInterval);
+            autoSaveInterval = null;
+        }
+    }
+    
+    function saveToServer() {
+        fetch('/api/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                records: R,
+                comments: C,
+                state: {pc: s.pc, ae: s.ae, de: s.de, aComplete: s.aComplete},
+                name: 'Auto-saved at ' + new Date().toLocaleString('ja-JP')
+            })
+        }).catch(console.error);
+    }
+    
+    function loadFromServer() {
+        fetch('/api/load-latest')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data) {
+                    R = data.data.records || [];
+                    C = data.data.comments || {};
+                    if (!s.ar && !s.dr) applyState(data.data.state);
+                    currentShareId = data.data_id || currentShareId;
+                    render();
+                    summary();
+                    charts();
+                    restoreState();
+                }
+            })
+            .catch(console.error);
+    }
+    
+    // Load data from server on start
+    loadFromServer();
+    startAutoSave();
+    
+    var q = function(x) { return document.getElementById(x); };
+    var e = {
+        ac: q('ac'), dc: q('dc'), ab: q('ab'), db: q('db'), ax: q('ax'), dx: q('dx'),
+        ad: q('ad'), dd: q('dd'), ap: q('ap'), dp: q('dp'),
+        body: q('body'), stats: q('stats'), empty: q('empty'), count: q('count'),
+        charts: q('charts'), modal: q('modal'), input: q('input'), display: q('display'),
+        addModal: q('addModal'), usernameModal: q('usernameModal'), shareModal: q('shareModal'),
+        importModal: q('importModal')
+    };
+    
+    function persist() {
+        localStorage.setItem('plugTimerRecords_v1', JSON.stringify(R));
+        localStorage.setItem('plugTimerComments_v1', JSON.stringify(C));
+        var st = {pc: s.pc, ae: s.ae, de: s.de, ar: s.ar, dr: s.dr, as: s.as, ds: s.ds, aComplete: s.aComplete};
+        localStorage.setItem('plugTimerState_v1', JSON.stringify(st));
+        saveToServer();
+    }
+    
+    function updateClock() {
+        var d = new Date();
+        q('clock').textContent = d.toLocaleTimeString('ja-JP', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+    
+    function tick(k) {
+        var run = k === 'a' ? s.ar : s.dr;
+        var st = k === 'a' ? s.as : s.ds;
+        var key = k === 'a' ? 'ae' : 'de';
+        var out = k === 'a' ? e.ad : e.dd;
+        if (run) {
+            s[key] = (performance.now() - st) / 1000;
+            out.textContent = fmt(s[key]);
+        }
+    }
+    
+    function focus() {
+        document.querySelector('.wrap').classList.toggle('focus-active', s.ar || s.dr);
+    }
+    
+    function start(k) {
+        var a = k === 'a', b = a ? e.ab : e.db, c = a ? e.ac : e.dc;
+        if (a) {
+            s.ar = true; s.as = performance.now() - s.ae * 1000;
+            s.at = setInterval(function(){ tick('a') }, 100);
+            e.ax.disabled = false;
+        } else {
+            s.dr = true; s.ds = performance.now() - s.de * 1000;
+            s.dt = setInterval(function(){ tick('d') }, 100);
+        }
+        b.textContent = '一時停止';
+        b.classList.add('running');
+        c.classList.add('active');
+        focus();
+        persist();
+    }
+    
+    function pause(k) {
+        var a = k === 'a', b = a ? e.ab : e.db, c = a ? e.ac : e.dc;
+        tick(k);
+        if (a) {
+            s.ar = false; clearInterval(s.at); e.ax.disabled = false;
+        } else {
+            s.dr = false; clearInterval(s.dt); e.dx.disabled = false;
+        }
+        b.textContent = '再開';
+        b.classList.remove('running');
+        c.classList.remove('active');
+        focus();
+        persist();
+    }
+    
+    e.ab.onclick = function() { s.ar ? pause('a') : start('a'); };
+    e.db.onclick = function() { s.dr ? pause('d') : start('d'); };
+    
+    function compare(out, time, pc, key) {
+        var a = rows(pc), p = a.length ? a[a.length - 1][key] : null;
+        out.innerHTML = p == null ? '前回比較: 同じ個数の記録なし' : '前回比較: ' + fmt(time - p);
+    }
+    
+    function completeA() {
+        if (s.ar) pause('a');
+        if (!s.ae) return;
+        e.ab.disabled = true; e.ax.disabled = true; e.db.disabled = false;
+        e.db.textContent = '開始'; e.dc.classList.remove('active');
+        s.aComplete = true;
+        compare(e.ap, s.ae, s.pc, 'assemblyTime');
+        persist();
+    }
+    
+    function completeD() {
+        if (s.dr) pause('d');
+        if (!s.de) return;
+        e.db.disabled = true; e.dx.disabled = true;
+        compare(e.dp, s.de, s.pc, 'disassemblyTime');
+        finish();
+    }
+    
+    e.ax.onclick = completeA;
+    e.dx.onclick = completeD;
+    
+    function finish() {
+        var ts = new Date().toISOString();
+        var l = L[s.pc], lv = s.ae <= l.a && s.de <= l.d ? l.level : null;
+        R.push({timestamp: ts, plugCount: s.pc, assemblyTime: s.ae, disassemblyTime: s.de, level: lv});
+        persist();
+        render();
+        s.ae = s.de = 0; s.aComplete = false;
+        e.ad.textContent = e.dd.textContent = '00:00.0';
+        e.ab.disabled = false; e.ab.textContent = '開始';
+        e.db.disabled = true; e.db.textContent = '開始';
+        e.ax.disabled = e.dx.disabled = true;
+        e.ap.innerHTML = e.dp.innerHTML = '';
+        e.dc.classList.remove('active');
+    }
+    
+    function restoreState() {
+        if (!s.aComplete) return;
+        e.ab.disabled = true; e.ax.disabled = false; e.db.disabled = false;
+        e.ad.textContent = fmt(s.ae); e.dd.textContent = fmt(s.de);
+        e.ac.classList.add('active');
+    }
+    
+    function rows(pc) {
+        return R.filter(function(r) { return r.plugCount === pc; });
+    }
+    
+    function render() {
+        e.count.textContent = R.length + '回の記録';
+        e.empty.style.display = R.length ? 'none' : 'block';
+        e.body.innerHTML = R.slice().reverse().map(function(r) {
+            var d = new Date(r.timestamp), c = C[r.timestamp],
+                lv = r.level ? '<span class="lvl-tag lvl-' + r.level + '">Lv' + r.level + '</span>' : '—';
+            return '<tr><td>' + d.toLocaleString('ja-JP', {year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'}) + 
+                   '</td><td>' + r.plugCount + '個</td><td>' + fmt(r.assemblyTime) + 
+                   '</td><td>' + fmt(r.disassemblyTime) + '</td><td>' + fmt(r.assemblyTime + r.disassemblyTime) + 
+                   '</td><td>' + lv + '</td><td><button class="comment-btn" data-ts="' + r.timestamp + '">💬' + 
+                   (c ? '<i class="comment-indicator"></i>' : '') + '</button></td><td><button class="row-del" data-ts="' + r.timestamp + '">✕</button></td></tr>';
+        }).join('');
+        
+        e.body.querySelectorAll('.comment-btn').forEach(function(b) {
+            b.onclick = function() {
+                var ts = b.dataset.ts, v = C[ts] || '';
+                s.edit = ts;
+                q('input').value = v;
+                if (v) { e.display.textContent = v; e.display.style.display = 'block'; }
+                else { e.display.style.display = 'none'; }
+                q('input').style.display = 'block';
+                e.modal.classList.add('show');
+            };
+        });
+        
+        e.body.querySelectorAll('.row-del').forEach(function(b) {
+            b.onclick = function() {
+                if (confirm('この記録を削除しますか？')) {
+                    R = R.filter(function(r) { return r.timestamp !== b.dataset.ts; });
+                    delete C[b.dataset.ts];
+                    persist();
+                    render();
+                }
+            };
+        });
+    }
+    
+    function summary() {
+        var l = L[s.pc], a = rows(s.pc),
+            vals = [
+                a.length ? Math.min.apply(null, a.map(function(r) { return r.assemblyTime; })) : null,
+                a.length ? a.reduce(function(x, r) { return x + r.assemblyTime; }, 0) / a.length : null,
+                a.length ? Math.min.apply(null, a.map(function(r) { return r.disassemblyTime; })) : null,
+                a.length ? a.reduce(function(x, r) { return x + r.disassemblyTime; }, 0) / a.length : null
+            ],
+            h = '<div class="summary"><div class="summary-head"><b class="summary-title">' + s.pc + '個・Lv' + l.level + '</b><span class="summary-sub">目標 組立 ' + fmt(l.a) + ' / 分解 ' + fmt(l.d) + '</span></div><div class="metrics">';
+        vals.forEach(function(v, i) {
+            h += '<div class="metric"><span class="label">' + ['組立 ベスト', '組立 平均', '分解 ベスト', '分解 平均'][i] + '</span><span class="value">' + (v == null ? '--' : fmt(v)) + '</span></div>';
+        });
+        h += '</div><div class="levels">';
+        G.forEach(function(pc) {
+            var n = rows(pc).filter(function(r) { return r.level === L[pc].level; }).length;
+            h += '<div class="level-row"><span class="level-name">Lv' + L[pc].level + '・' + pc + '個</span><span class="bar"><i style="width:' + Math.min(n, 3) / 3 * 100 + '%"></i></span><span class="level-count">' + n + ' / 3回</span></div>';
+        });
+        e.stats.innerHTML = h + '</div></div>';
+    }
+    
+    function charts() {
+        e.charts.innerHTML = R.length ? G.map(function(pc) {
+            var n = rows(pc).length;
+            return n ? '<div class="chart"><div class="chart-title">レベル' + L[pc].level + '・' + pc + '個</div><div class="empty">記録 ' + n + '件</div></div>' : '';
+        }).join('') : '<div class="empty">まだ記録がありません</div>';
+    }
+    
+    document.querySelectorAll('input[name=count]').forEach(function(r) {
+        r.onchange = function() {
+            s.pc = +r.value;
+            document.querySelectorAll('.radio-option').forEach(function(x) {
+                x.classList.toggle('selected', x.querySelector('input').checked);
+            });
+            summary();
+            persist();
+        };
+    });
+    
+    // Modal handlers
+    q('close').onclick = q('cancel').onclick = function() { e.modal.classList.remove('show'); };
+    
+    q('saveComment').onclick = function() {
+        if (s.edit) {
+            var v = q('input').value.trim();
+            if (v) C[s.edit] = v;
+            else delete C[s.edit];
+            persist();
+            render();
+        }
+        e.modal.classList.remove('show');
+    };
+    
+    q('addBtn').onclick = function() {
+        e.addModal.classList.add('show');
+        q('addCount').value = '10';
+        q('addAssembly').value = '';
+        q('addDisassembly').value = '';
+        q('addComment').value = '';
+    };
+    
+    q('addClose').onclick = q('addCancel').onclick = function() { e.addModal.classList.remove('show'); };
+    
+    q('addSave').onclick = function() {
+        var pc = parseInt(q('addCount').value, 10),
+            a = parseTime(q('addAssembly').value),
+            d = parseTime(q('addDisassembly').value),
+            cmt = q('addComment').value.trim();
+        if (a === null || d === null) {
+            alert('時間の形式が正しくありません。例: 07:30.5');
+            return;
+        }
+        var ts = new Date().toISOString(),
+            l = L[pc], lv = a <= l.a && d <= l.d ? l.level : null;
+        R.push({timestamp: ts, plugCount: pc, assemblyTime: a, disassemblyTime: d, level: lv});
+        if (cmt) C[ts] = cmt;
+        persist();
+        render();
+        summary();
+        e.addModal.classList.remove('show');
+    };
+    
+    q('clear').onclick = function() {
+        if (R.length && confirm('すべての記録を削除します。よろしいですか？')) {
+            R = []; C = {};
+            persist();
+            render();
+            summary();
+        }
+    };
+    
+    q('export').onclick = function() {
+        if (!R.length) return alert('記録がまだありません');
+        var a = document.createElement('a');
+        a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(R, null, 2));
+        a.download = 'plug-timer-records-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+    };
+    
+    q('importBtn').onclick = function() { q('fileInput').click(); };
+    
+    q('fileInput').onchange = function(x) {
+        var f = x.target.files[0];
+        if (!f) return;
+        var rd = new FileReader();
+        rd.onload = function() {
+            try {
+                var z = JSON.parse(rd.result);
+                if (!Array.isArray(z)) throw 0;
+                R = R.concat(z);
+                var seen = {};
+                R = R.filter(function(r) {
+                    var k = r.timestamp + '-' + r.plugCount;
+                    if (seen[k]) return false;
+                    seen[k] = 1;
+                    return true;
+                });
+                R.sort(function(a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
+                persist();
+                render();
+                summary();
+                charts();
+            } catch(err) { alert('ファイルの読み込みに失敗しました'); }
+        };
+        rd.readAsText(f);
+        x.target.value = '';
+    };
+    
+    // Show QR button
+    q('showQrBtn').onclick = function() {
+        var qrSection = q('qrSection');
+        qrSection.style.display = qrSection.style.display === 'none' ? 'block' : 'none';
+    };
+    
+    // Username modal functions
+    function showUsernameModal() {
+        e.usernameModal.classList.add('show');
+        q('newUsername').value = username;
+    }
+    
+    window.showUsernameModal = showUsernameModal;
+    q('usernameClose').onclick = q('usernameCancel').onclick = function() {
+        e.usernameModal.classList.remove('show');
+    };
+    
+    q('usernameSave').onclick = function() {
+        var newUsername = q('newUsername').value.trim();
+        if (!newUsername) {
+            alert('ユーザー名を入力してください');
+            return;
+        }
+        
+        fetch('/api/user/set-username', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: newUsername})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                username = newUsername;
+                e.usernameModal.classList.remove('show');
+                alert('ユーザー名が更新されました');
+                location.reload();
+            } else {
+                alert(data.message || '更新に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+    };
+    
+    // Share modal functions
+    function showShareModal() {
+        e.shareModal.classList.add('show');
+        q('shareName').value = '';
+        q('sharePreview').innerHTML = '';
+    }
+    
+    q('shareClose').onclick = q('shareCancel').onclick = function() {
+        e.shareModal.classList.remove('show');
+    };
+    
+    q('shareCreate').onclick = function() {
+        var shareName = q('shareName').value.trim() || 'My Plug Timer Data';
+        
+        fetch('/api/share', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                name: shareName,
+                data_id: currentShareId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentShareId = data.share_id;
+                e.shareModal.classList.remove('show');
+                alert('共有リンクが作成されました: ' + data.share_url);
+                location.reload();
+            } else {
+                alert(data.message || '共有リンクの作成に失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+    };
+    
+    // Copy share link
+    function copyShareLink() {
+        var shareLink = q('shareLink');
+        if (shareLink) {
+            navigator.clipboard.writeText(shareLink.textContent)
+                .then(() => alert('リンクをコピーしました'))
+                .catch(err => alert('コピーに失敗しました'));
+        }
+    }
+    
+    // Import/bind modal
+    q('importBtn').onclick = function() {
+        // Show import modal instead of file picker
+        e.importModal.classList.add('show');
+        q('bindInput').value = '';
+    };
+    
+    q('importClose').onclick = q('bindCancel').onclick = function() {
+        e.importModal.classList.remove('show');
+    };
+    
+    q('bindSubmit').onclick = function() {
+        var bindContent = q('bindInput').value.trim();
+        if (!bindContent) {
+            alert('QRコード内容または共有IDを入力してください');
+            return;
+        }
+        
+        fetch('/api/bind', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({qr_content: bindContent})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                e.importModal.classList.remove('show');
+                alert('データをインポートしました');
+                loadFromServer();
+            } else {
+                alert(data.message || 'インポートに失敗しました');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('エラーが発生しました');
+        });
+    };
+    
+    // Initialize
+    document.querySelector('.radio-option').classList.add('selected');
+    render();
+    summary();
+    charts();
+    restoreState();
+    
+    // Save on page unload
+    window.addEventListener('beforeunload', function() {
+        stopAutoSave();
+        persist();
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        // Space to start/pause timer
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (!s.aComplete && !s.ar) {
+                start('a');
+            } else if (s.ar) {
+                pause('a');
+            } else if (s.aComplete && !s.dr) {
+                start('d');
+            } else if (s.dr) {
+                pause('d');
+            }
+        }
+        
+        // Enter to complete current phase
+        if (e.code === 'Enter') {
+            e.preventDefault();
+            if (s.ar) {
+                completeA();
+            } else if (s.dr) {
+                completeD();
+            }
+        }
+    });
+    
+    // Periodic sync with server
+    setInterval(function() {
+        if (navigator.onLine) {
+            loadFromServer();
+        }
+    }, 300000); // Sync every 5 minutes
+})();
+</script>
+{% endblock %}

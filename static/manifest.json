@@ -1,0 +1,20 @@
+{
+  "name": "プラグ組立・分解 タイム記録",
+  "short_name": "プラグタイマー",
+  "description": "プラグの組立と分解の時間を記録し、進捗を追跡するタイム記録アプリ",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f2efe9",
+  "theme_color": "#c9891f",
+  "lang": "ja",
+  "categories": ["productivity"],
+  "icons": [
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/static/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable"},
+    {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
